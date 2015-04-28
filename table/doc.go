@@ -46,6 +46,12 @@ of the block stores the offsets of all of the restart points, and can be used to
 a binary search when looking for a particular key. Values are stored without compression
 immediately following the corresponding key.
 
+Index Block:
+
+The index block contains one entry per data block, where the key is a string >= last key 
+in that data block and before the first key in the successive data block.  The value is the
+BlockHandle for the data block.
+
 Data Block Structure:
 
     +---------------+  -> Restart point
@@ -57,14 +63,14 @@ Data Block Structure:
     +---------------+
     | Block entry n | 
     +---------------+
-    | Trailer       |  -> Table block trailer:
-    +---------------+       +---------------------------+   The checksum is a CRC-32 computed using
-                            | Compression type (1-byte) |   Castagnoli's polynomial. Compression
-                            +---------------------------+   type also included in the checksum.
-                            | Checksum (4-byte)         |
-                            +---------------------------+
+    | Trailer       |  -> Block trailer:
+    +---------------+       +---------------------------------+   
+                            | Restarts (uint32[num_restarts]) |  restarts[i] contains the offset within the block 
+                            +---------------------------------+  of the nth restart point.  
+                            | Number of restarts (uint32)     |
+                            +---------------------------------+
 
- Block Entry Structure:
+Block Entry Structure:
 
     +----------------------+
     | Shared (varint32)    |
@@ -78,12 +84,23 @@ Data Block Structure:
     | Value ([]byte)       |  -> Slice of value length
     +----------------------+
 
-    Shared == 0 for restart points.
+    Shared == 0 for restart point.
 
- */
+Block in SSTable file: 
+
+An extra block "footer" is saved for each data block that indicates if the block is saved 
+compressed or uncompressed in the file and a CRC checksum for error protection.
+
+The checksum is a CRC-32 computed using Castagnoli's polynomial. Compression type 
+also included in the checksum.
+
+    +---------------------------+
+    | Data Block Structure      |
+    +---------------------------+
+    | Compression type (1-byte) |   
+    +---------------------------+   
+    | Checksum (4-byte)         |
+    +---------------------------+
+
+*/
 package table                           
-
-// The trailer of the block has the form:
-//     restarts: uint32[num_restarts]
-//     num_restarts: uint32
-// restarts[i] contains the offset within the block of the ith restart point.

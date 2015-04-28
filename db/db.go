@@ -29,7 +29,7 @@ type DB interface {
 	Find(key interface{}) Iterator
 
 	//
-	Tx() Transaction
+	Tx() Tx
 
 	// Close closes the DB. It may or may not close any underlying io.Reader
 	// or io.Writer, depending on how the DB was created.

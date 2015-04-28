@@ -5,7 +5,7 @@
 package table
 
 import (
-	"fmt"
+	_ "fmt"
 	"testing"
 )
 
@@ -15,23 +15,30 @@ func TestTableOpen(t *testing.T) {
 	if table, err := Open("../data/h.no-compression.sst"); err != nil {
 		t.Error(err)
 	} else {
-		fmt.Println(table)
-
 		sst := table.(*ssTable)
+		sst.Dump()
 		sst.file.Close()
 	}
 }
-/*
-func TestTableReadBlock(t *testing.T) {
+
+func BenchmarkEntryIterator(b *testing.B) { 
 	if table, err := Open("../data/h.no-compression.sst"); err != nil {
-		t.Error(err)
+		b.Error(err)
 	} else {
+		b.StartTimer()
+
 		sst := table.(*ssTable)
+		idx := sst.BlockIndex.next
 
-		block, _ := sst.readBlock(sst.BlockIndexHandle)
-		fmt.Println(string(block))
+		for i := 0; i < b.N; i++ {
+			if block, err := sst.readBlock(&idx.Handle); err == nil {
+				iter := NewEntryIterator(block) 
 
-		sst.file.Close()
+				for _, ok := iter.Next(); ok; { 
+					
+					_, ok = iter.Next()
+				}
+			}
+		}
 	}
 }
-*/

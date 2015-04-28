@@ -29,8 +29,6 @@ var (
 
 type Slice []byte
 
-type Iterator interface {}
-
 // A Table is a sorted map from strings to strings.
 type Table interface {
 	// Returns an iterator over the table contents.
@@ -60,20 +58,25 @@ func Open(filename string) (Table, error) {
 		return nil, err
 	}
 
-	if err = table.readMeta(); err != nil {
+	// Read the meta block
+	if metaBlock, err := table.readBlock(table.MetaIndexHandle); err != nil {
 		return nil, err
+	} else {
+		table.MetaIndex = metaBlock.DecodeIndexEntries()
 	}
 
 	// Read the index block
-	if err = table.readIndex(); err != nil {
+	if indexBlock, err := table.readBlock(table.BlockIndexHandle); err != nil {
 		return nil, err
+	} else {
+		table.BlockIndex = indexBlock.DecodeIndexEntries()
 	}
 
 	return table, nil
 }
 
 //---------------------------------------------------------------------------------------
-//
+// Sorted String Table
 //---------------------------------------------------------------------------------------
 
 type ssTable struct {
@@ -82,6 +85,9 @@ type ssTable struct {
 	// Handles to the specified file location
 	MetaIndexHandle  *BlockHandle
 	BlockIndexHandle *BlockHandle
+
+	MetaIndex  *IndexEntry
+	BlockIndex *IndexEntry
 }
 
 func (self ssTable) String() string {
@@ -89,11 +95,22 @@ func (self ssTable) String() string {
 }
 
 func (self *ssTable) Iterator() Iterator {
-	return nil
+	return &ssTableIterator{
+		sst: self,
+		idx: self.BlockIndex.next,
+	}
 }
 
 func (self *ssTable) ApproximateOffsetOf(key interface{}) uint64 {
 	return uint64(0)
+}
+
+func (self ssTable) get(entry *IndexEntry) Slice {
+
+	if _, err := self.readBlock(&entry.Handle); err != nil {
+		return nil
+	} 
+	return nil
 }
 
 func (self *ssTable) readFooter() error {
@@ -127,41 +144,33 @@ func (self *ssTable) readFooter() error {
 	return nil
 }
 
-func (self *ssTable) readIndex() error {
-
-	indexBlock, err := self.readBlock(self.BlockIndexHandle)
-
-	if  err != nil {
-		return err
-	} 
-
-	fmt.Printf("Restarts: %#v \n", indexBlock.NumberOfRestarts())
-
-	var be BlockIndexEntry
-	var n0, n1, n2 int
-
-	for i := 0; i < int(indexBlock.NumberOfRestarts()); i++ {
-		be.Shared,   n0 = binary.Uvarint(indexBlock)
-		be.Unshared, n1 = binary.Uvarint(indexBlock[n0:])
-		be.ValueLen, n2 = binary.Uvarint(indexBlock[n0 + n1:])
-	
-		n := n0 + n1 + n2
-		be.Key   = Slice(append(be.Key[:int(be.Shared)], indexBlock[n:n + int(be.Unshared)]...))
-		be.Value = Slice(indexBlock[n + int(be.Unshared):n + int(be.Unshared + be.ValueLen)])
-		indexBlock = indexBlock[n + int(be.Unshared + be.ValueLen):]
-	
-		be.Handle.Decode(be.Value)
-	
-		fmt.Println(be)
+func (self ssTable) Dump() {
+	fmt.Println()
+	fmt.Println(self)
+	fmt.Println()
+	fmt.Println("** Block Index **")
+	fmt.Println()
+	for i := self.BlockIndex.next; i != nil; i = i.next {
+		fmt.Println(i)
 	}
+	fmt.Println()
+	fmt.Println("** Metadata Index **")
+	fmt.Println()
+	for i := self.MetaIndex.next; i != nil; i = i.next {
+		fmt.Println(i)
+	}
+	fmt.Println()
+	fmt.Println("** First Data Block **")
+	fmt.Println()
+	idx := self.BlockIndex.next
+	if block, err := self.readBlock(&idx.Handle); err == nil {
+		iter := NewEntryIterator(block) 
+		for entry, ok := iter.Next(); ok; { 
+			fmt.Println(entry)
 
-	return nil
-}
-
-func (self *ssTable) readMeta() error {
-
-	//readBlock(self.MetaIndexHandle)
-	return nil
+			entry, ok = iter.Next()
+		}
+	}
 }
 
 func (self *ssTable) readFilter() error {

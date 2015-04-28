@@ -6,6 +6,9 @@ package db
 
 // Iterator iterates over a DB's key/value pairs in key order.
 type Iterator interface {
+	// Is positioned at a valid node
+	Valid() bool
+	
 	// Next moves the iterator to the next key/value pair.
 	// It returns whether the iterator is exhausted.
 	Next() bool

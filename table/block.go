@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 )
 
 const (
@@ -163,6 +164,9 @@ func (self *Footer) Decode(data Slice) (int, error) {
 // Block
 //---------------------------------------------------------------------------------------
 
+/* 
+Blocks have one or many key/value entries followed by a block trailer structure.
+*/
 type Block []byte
 
 func (self Block) NumberOfRestarts() uint32 {
@@ -171,7 +175,54 @@ func (self Block) NumberOfRestarts() uint32 {
 
 func (self Block) RestartStartOffset() int {
 	return len(self) - (1 + int(self.NumberOfRestarts())) * 4
+}
+
+func (self Block) DecodeIndexEntries() *IndexEntry {
+	var root, current *IndexEntry
+
+	root = new(IndexEntry)
+	numRestarts := int(self.NumberOfRestarts())
+
+	for i := 0; i < numRestarts; i++ {
+		shared,   n0 := binary.Uvarint(self)
+		unshared, n1 := binary.Uvarint(self[n0:])
+		valueLen, n2 := binary.Uvarint(self[n0 + n1:])
+	
+		var ie = new(IndexEntry)
+
+		n := n0 + n1 + n2
+		ie.Key =  Slice(append(ie.Key[:int(shared)], self[n:n + int(unshared)]...))
+		value  := Slice(self[n + int(unshared):n + int(unshared + valueLen)])
+		self = self[n + int(unshared + valueLen):]
+	
+		ie.Handle.Decode(value)
+	
+		if root.next == nil {
+			root.next = ie
+			current = ie
+		} else {
+			current.next = ie
+			current = ie
+		}
+	}
+
+	return root
 } 
+
+func (self Block) Find(key Slice) EntryIterator {
+	restarts := self.NumberOfRestarts()
+	if restarts == 0  {
+		return nil
+	}
+
+	// Search uses binary search to find and return the smallest index
+	pos := sort.Search(int(restarts), func(i int) bool {
+		return false	
+	})
+	pos++
+
+	return nil
+}
 
 //---------------------------------------------------------------------------------------
 // Block Entry
@@ -196,20 +247,20 @@ func (self BlockEntry) String() string {
 }
 
 //---------------------------------------------------------------------------------------
-// Block Index Entry
+// Index Entry
 //---------------------------------------------------------------------------------------
 
-type BlockIndexEntry struct {
-	BlockEntry
-
+/*
+The index entry contains the last key in that data block and is less then the first key in 
+the successive data block.  The value is the BlockHandle for the data block.
+*/
+type IndexEntry struct {
+	Key Slice
 	Handle BlockHandle
+
+	next *IndexEntry
 }
 
-func (self BlockIndexEntry) String() string {
-	return fmt.Sprintf("BlockIndexEntry { Shared: %v, Unshared: %v, ValueLen: %v, Key: %8s, Handle: %v}", 
-						self.Shared, 
-						self.Unshared,
-						self.ValueLen,
-						self.Key,
-						self.Handle)
+func (self IndexEntry) String() string {
+	return fmt.Sprintf("IndexEntry { Key: %8s, Handle: %v}", self.Key, self.Handle)
 }
