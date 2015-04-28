@@ -28,7 +28,7 @@ func BenchmarkEntryIterator(b *testing.B) {
 		b.StartTimer()
 
 		sst := table.(*ssTable)
-		idx := sst.BlockIndex.next
+		idx := sst.BlockIndex[0]
 
 		for i := 0; i < b.N; i++ {
 			if block, err := sst.readBlock(&idx.Handle); err == nil {

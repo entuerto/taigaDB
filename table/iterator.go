@@ -32,16 +32,18 @@ type Iterator interface {
 
 type ssTableIterator struct {
 	sst *ssTable
-	idx *IndexEntry
+	idx IndexSlice
+
+	pos int
 }
 
 func (self ssTableIterator) Valid() bool {
-	return self.idx != nil
+	return self.pos != self.idx.Len()
 }
 
 func (self *ssTableIterator) Next() bool {
 	if self.Valid() {
-		self.idx = self.idx.next
+		self.pos++
 	}
 	
 	return self.Valid()
@@ -49,14 +51,14 @@ func (self *ssTableIterator) Next() bool {
 
 func (self ssTableIterator) Key() Slice {
 	if self.Valid() {
-		return self.idx.Key
+		return self.idx[self.pos].Key
 	}
 	return nil
 }
 
 func (self ssTableIterator) Value() Slice {
 	if self.Valid() {
-		return self.sst.get(self.idx)
+		return nil
 	}
 	return nil
 }
@@ -80,18 +82,21 @@ func (self *blockEntryIterator) Next() (*BlockEntry, bool) {
 		return nil, false
 	}
 
+	b := self.data
+	entry := &self.entry
+
 	var n0, n1, n2 int
-	self.entry.Shared,   n0 = binary.Uvarint(self.data)
-	self.entry.Unshared, n1 = binary.Uvarint(self.data[n0:])
-	self.entry.ValueLen, n2 = binary.Uvarint(self.data[n0 + n1:])
+	entry.Shared,   n0 = binary.Uvarint(b)
+	entry.Unshared, n1 = binary.Uvarint(b[n0:])
+	entry.ValueLen, n2 = binary.Uvarint(b[n0 + n1:])
 	
 	n := n0 + n1 + n2
-	self.entry.Key   = Slice(append(self.entry.Key[:int(self.entry.Shared)], self.data[n:n + int(self.entry.Unshared)]...))
-	self.entry.Value = Slice(self.data[n + int(self.entry.Unshared):n + int(self.entry.Unshared + self.entry.ValueLen)])
+	entry.Key   = Slice(append(entry.Key[:int(entry.Shared)], b[n:n + int(entry.Unshared)]...))
+	entry.Value = Slice(b[n + int(entry.Unshared):n + int(entry.Unshared + entry.ValueLen)])
 
-	self.data = self.data[n + int(self.entry.Unshared + self.entry.ValueLen):]
+	self.data = b[n + int(entry.Unshared + entry.ValueLen):]
 	
-	return &self.entry, true
+	return entry, true
 }
 
 func NewEntryIterator(b Block) EntryIterator {

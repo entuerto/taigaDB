@@ -31,6 +31,9 @@ type Slice []byte
 
 // A Table is a sorted map from strings to strings.
 type Table interface {
+	// Look for a key/value in the table.
+	Lookup(key Slice) (Slice, error)
+
 	// Returns an iterator over the table contents.
 	Iterator() Iterator
 
@@ -86,8 +89,8 @@ type ssTable struct {
 	MetaIndexHandle  *BlockHandle
 	BlockIndexHandle *BlockHandle
 
-	MetaIndex  *IndexEntry
-	BlockIndex *IndexEntry
+	MetaIndex  IndexSlice
+	BlockIndex IndexSlice
 }
 
 func (self ssTable) String() string {
@@ -97,7 +100,7 @@ func (self ssTable) String() string {
 func (self *ssTable) Iterator() Iterator {
 	return &ssTableIterator{
 		sst: self,
-		idx: self.BlockIndex.next,
+		idx: self.BlockIndex,
 	}
 }
 
@@ -105,12 +108,10 @@ func (self *ssTable) ApproximateOffsetOf(key interface{}) uint64 {
 	return uint64(0)
 }
 
-func (self ssTable) get(entry *IndexEntry) Slice {
+func (self ssTable) Lookup(key Slice) (Slice, error) {
 
-	if _, err := self.readBlock(&entry.Handle); err != nil {
-		return nil
-	} 
-	return nil
+	
+	return nil, nil
 }
 
 func (self *ssTable) readFooter() error {
@@ -150,19 +151,19 @@ func (self ssTable) Dump() {
 	fmt.Println()
 	fmt.Println("** Block Index **")
 	fmt.Println()
-	for i := self.BlockIndex.next; i != nil; i = i.next {
+	for _, i := range self.BlockIndex {
 		fmt.Println(i)
 	}
 	fmt.Println()
 	fmt.Println("** Metadata Index **")
 	fmt.Println()
-	for i := self.MetaIndex.next; i != nil; i = i.next {
+	for _, i := range self.MetaIndex {
 		fmt.Println(i)
 	}
 	fmt.Println()
 	fmt.Println("** First Data Block **")
 	fmt.Println()
-	idx := self.BlockIndex.next
+	idx := self.BlockIndex[0]
 	if block, err := self.readBlock(&idx.Handle); err == nil {
 		iter := NewEntryIterator(block) 
 		for entry, ok := iter.Next(); ok; { 

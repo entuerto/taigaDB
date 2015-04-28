@@ -177,11 +177,9 @@ func (self Block) RestartStartOffset() int {
 	return len(self) - (1 + int(self.NumberOfRestarts())) * 4
 }
 
-func (self Block) DecodeIndexEntries() *IndexEntry {
-	var root, current *IndexEntry
-
-	root = new(IndexEntry)
+func (self Block) DecodeIndexEntries() IndexSlice {
 	numRestarts := int(self.NumberOfRestarts())
+	idxSlice := make(IndexSlice, numRestarts)
 
 	for i := 0; i < numRestarts; i++ {
 		shared,   n0 := binary.Uvarint(self)
@@ -197,16 +195,10 @@ func (self Block) DecodeIndexEntries() *IndexEntry {
 	
 		ie.Handle.Decode(value)
 	
-		if root.next == nil {
-			root.next = ie
-			current = ie
-		} else {
-			current.next = ie
-			current = ie
-		}
+		idxSlice[i] = ie
 	}
 
-	return root
+	return idxSlice
 } 
 
 func (self Block) Find(key Slice) EntryIterator {
@@ -257,10 +249,32 @@ the successive data block.  The value is the BlockHandle for the data block.
 type IndexEntry struct {
 	Key Slice
 	Handle BlockHandle
-
-	next *IndexEntry
 }
 
 func (self IndexEntry) String() string {
 	return fmt.Sprintf("IndexEntry { Key: %8s, Handle: %v}", self.Key, self.Handle)
+}
+
+type IndexSlice []*IndexEntry
+
+func (self IndexSlice) Len() int { 
+	return len(self) 
+}
+
+func (self IndexSlice) Less(i, j int) bool { 
+	return string(self[i].Key) < string(self[j].Key) 
+}
+
+func (self IndexSlice) Swap(i, j int) { 
+	self[i], self[j] = self[j], self[i] 
+}
+
+// Sort is a convenience method.
+func (self IndexSlice) Sort() { 
+	sort.Sort(self) 
+}
+
+// Search returns the result of applying Search to the receiver and x. 
+func (self IndexSlice) Search(key Slice) int { 
+	return sort.Search(len(self), func(i int) bool { return string(self[i].Key) >= string(key) })
 }
