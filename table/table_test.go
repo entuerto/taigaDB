@@ -12,13 +12,26 @@ import (
 
 
 func TestTableOpen(t *testing.T) {
-	if table, err := Open("../data/h.no-compression.sst"); err != nil {
+	if _, err := Open("../data/h.no-compression.sst"); err != nil {
 		t.Error(err)
-	} else {
-		sst := table.(*ssTable)
-		sst.Dump()
-		sst.file.Close()
+	} 
+}
+
+func TestTableLookup(t *testing.T) {
+	table, err := Open("../data/h.no-compression.sst")
+
+	if err != nil {
+		t.Error(err)
+	} 
+
+	value, err := table.Lookup(Slice("school")) 
+	if err != nil {
+		t.Error(err)
 	}
+	if string(value) != "1" {
+		t.Errorf("Looking for school, got %s", value)
+	}
+
 }
 
 func BenchmarkEntryIterator(b *testing.B) { 

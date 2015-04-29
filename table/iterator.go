@@ -5,7 +5,6 @@
 package table
 
 import (
-	"encoding/binary"
 )
 
 // Iterator iterates over a Table's key/value pairs in key order.
@@ -82,21 +81,9 @@ func (self *blockEntryIterator) Next() (*BlockEntry, bool) {
 		return nil, false
 	}
 
-	b := self.data
-	entry := &self.entry
-
-	var n0, n1, n2 int
-	entry.Shared,   n0 = binary.Uvarint(b)
-	entry.Unshared, n1 = binary.Uvarint(b[n0:])
-	entry.ValueLen, n2 = binary.Uvarint(b[n0 + n1:])
+	self.data = readBlockEntry(self.data, &self.entry)
 	
-	n := n0 + n1 + n2
-	entry.Key   = Slice(append(entry.Key[:int(entry.Shared)], b[n:n + int(entry.Unshared)]...))
-	entry.Value = Slice(b[n + int(entry.Unshared):n + int(entry.Unshared + entry.ValueLen)])
-
-	self.data = b[n + int(entry.Unshared + entry.ValueLen):]
-	
-	return entry, true
+	return &self.entry, true
 }
 
 func NewEntryIterator(b Block) EntryIterator {

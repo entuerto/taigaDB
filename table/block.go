@@ -6,7 +6,6 @@ package table
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"sort"
 )
@@ -24,13 +23,6 @@ const (
 
 	// Encoded length of a Footer.
 	FooterEncodedLength = 2 * MaxEncodedLength + 8
-)
-
-var (
-	EncodeBlockHandleBufferErr = errors.New("BlockHandle.Encode: Buffer too small")
-	EncodeFooterBufferErr      = errors.New("Footer.Encode: Buffer too small")
-	DecodeSmallBufferErr = errors.New("Decode: Buffer to small")
-	DecodeNot64bitsErr   = errors.New("Decode: Value is not 64bits")
 )
 
 //---------------------------------------------------------------------------------------
@@ -169,51 +161,70 @@ Blocks have one or many key/value entries followed by a block trailer structure.
 */
 type Block []byte
 
-func (self Block) NumberOfRestarts() uint32 {
-	return binary.LittleEndian.Uint32(self[len(self) - 4:])
+func (self Block) NumberOfRestarts() int {
+	return int(binary.LittleEndian.Uint32(self[len(self) - 4:]))
 }
 
 func (self Block) RestartStartOffset() int {
 	return len(self) - (1 + int(self.NumberOfRestarts())) * 4
 }
 
-func (self Block) DecodeIndexEntries() IndexSlice {
-	numRestarts := int(self.NumberOfRestarts())
-	idxSlice := make(IndexSlice, numRestarts)
-
-	for i := 0; i < numRestarts; i++ {
-		shared,   n0 := binary.Uvarint(self)
-		unshared, n1 := binary.Uvarint(self[n0:])
-		valueLen, n2 := binary.Uvarint(self[n0 + n1:])
-	
-		var ie = new(IndexEntry)
-
-		n := n0 + n1 + n2
-		ie.Key =  Slice(append(ie.Key[:int(shared)], self[n:n + int(unshared)]...))
-		value  := Slice(self[n + int(unshared):n + int(unshared + valueLen)])
-		self = self[n + int(unshared + valueLen):]
-	
-		ie.Handle.Decode(value)
-	
-		idxSlice[i] = ie
-	}
-
-	return idxSlice
-} 
-
-func (self Block) Find(key Slice) EntryIterator {
-	restarts := self.NumberOfRestarts()
-	if restarts == 0  {
+func (self Block) RestartSlice() []uint32 {
+	numRestarts := self.NumberOfRestarts()
+	if numRestarts == 0  {
 		return nil
 	}
 
+	restarts := make([]uint32, numRestarts)
+
+	data := self[self.RestartStartOffset():]
+	for i := 0; i < numRestarts; i++ {
+		restarts[i] = binary.LittleEndian.Uint32(data[4 * i:])
+	}
+	return restarts
+}
+
+func (self Block) Search(key Slice) *BlockEntry {
+	numRestarts := self.NumberOfRestarts()
+	if numRestarts == 0  {
+		return nil
+	}
+
+	restarts := self.RestartSlice()
+
+	var entry BlockEntry
 	// Search uses binary search to find and return the smallest index
-	pos := sort.Search(int(restarts), func(i int) bool {
-		return false	
+	pos := sort.Search(numRestarts, func(i int) bool {
+		readBlockEntry(self[restarts[i]:], &entry)
+
+		return string(entry.Key) > string(key)	
 	})
-	pos++
+
+	if pos < numRestarts {
+		// Goto previous restart because we found Key > restart(key)
+		pos--
+		
+		iter := NewEntryIterator(self[restarts[pos]:]) 
+		for e, ok := iter.Next(); ok; { 
+			if string(e.Key) == string(key) {
+				return e
+			}
+			e, ok = iter.Next()
+		}
+
+	}
 
 	return nil
+}
+
+// Prints block entries for debuging porposes
+func (self Block) Dump() {
+	iter := NewEntryIterator(self) 
+	for entry, ok := iter.Next(); ok; { 
+		fmt.Println(entry)
+
+		entry, ok = iter.Next()
+	}
 }
 
 //---------------------------------------------------------------------------------------
@@ -238,6 +249,21 @@ func (self BlockEntry) String() string {
 		              self.Value)
 }
 
+// Helper function to decode the next block entry. 
+// It returns the truncated block slice that was read.
+func readBlockEntry(b Block, entry *BlockEntry) Block {
+	var n0, n1, n2 int
+	entry.Shared,   n0 = binary.Uvarint(b)
+	entry.Unshared, n1 = binary.Uvarint(b[n0:])
+	entry.ValueLen, n2 = binary.Uvarint(b[n0 + n1:])
+	
+	n := n0 + n1 + n2
+	entry.Key   = Slice(append(entry.Key[:int(entry.Shared)], b[n:n + int(entry.Unshared)]...))
+	entry.Value = Slice(b[n + int(entry.Unshared):n + int(entry.Unshared + entry.ValueLen)])
+
+	return b[n + int(entry.Unshared + entry.ValueLen):]
+}
+
 //---------------------------------------------------------------------------------------
 // Index Entry
 //---------------------------------------------------------------------------------------
@@ -253,6 +279,32 @@ type IndexEntry struct {
 
 func (self IndexEntry) String() string {
 	return fmt.Sprintf("IndexEntry { Key: %8s, Handle: %v}", self.Key, self.Handle)
+}
+
+// Helper function to decode the index entries. 
+// It returns an index slice.
+func decodeIndexEntries(b Block) IndexSlice {
+	numRestarts := b.NumberOfRestarts()
+	idxSlice := make(IndexSlice, numRestarts)
+
+	for i := 0; i < numRestarts; i++ {
+		shared,   n0 := binary.Uvarint(b)
+		unshared, n1 := binary.Uvarint(b[n0:])
+		valueLen, n2 := binary.Uvarint(b[n0 + n1:])
+	
+		var ie = new(IndexEntry)
+
+		n := n0 + n1 + n2
+		ie.Key =  Slice(append(ie.Key[:int(shared)], b[n:n + int(unshared)]...))
+		value  := Slice(b[n + int(unshared):n + int(unshared + valueLen)])
+		b = b[n + int(unshared + valueLen):]
+	
+		ie.Handle.Decode(value)
+	
+		idxSlice[i] = ie
+	}
+
+	return idxSlice
 }
 
 type IndexSlice []*IndexEntry

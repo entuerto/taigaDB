@@ -6,7 +6,6 @@ package table
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 
@@ -16,15 +15,6 @@ import (
 const (
 	NoCompression     = 0
 	SnappyCompression = 1
-)
-
-var ( 
-	BlockReadCorruptionErr = errors.New("Table.Block: Block read corruption")
-	BlockCRC32CorruptionErr = errors.New("Table.Block: Block checksum mismatch")
-	TableMagicNumberErr = errors.New("Table: Wrong table format")
-	TableBlockCompressionErr = errors.New("Table.Block: Wrong compression format")
-
-	NotImplementedErr = errors.New("Table: Not implemented")
 )
 
 type Slice []byte
@@ -65,14 +55,14 @@ func Open(filename string) (Table, error) {
 	if metaBlock, err := table.readBlock(table.MetaIndexHandle); err != nil {
 		return nil, err
 	} else {
-		table.MetaIndex = metaBlock.DecodeIndexEntries()
+		table.MetaIndex = decodeIndexEntries(metaBlock)
 	}
 
 	// Read the index block
 	if indexBlock, err := table.readBlock(table.BlockIndexHandle); err != nil {
 		return nil, err
 	} else {
-		table.BlockIndex = indexBlock.DecodeIndexEntries()
+		table.BlockIndex = decodeIndexEntries(indexBlock)
 	}
 
 	return table, nil
@@ -109,9 +99,23 @@ func (self *ssTable) ApproximateOffsetOf(key interface{}) uint64 {
 }
 
 func (self ssTable) Lookup(key Slice) (Slice, error) {
-
+	//
+	i := self.BlockIndex.Search(key)
+	if i == self.BlockIndex.Len() {
+		return nil, NotFoundErr
+	}
 	
-	return nil, nil
+	blockIdx := self.BlockIndex[i]
+	block, err := self.readBlock(&blockIdx.Handle)
+	if err != nil {
+		return nil, err
+	}
+
+	entry := block.Search(key)
+	if entry != nil {
+		return entry.Value, nil
+	}	
+	return nil, NotFoundErr
 }
 
 func (self *ssTable) readFooter() error {
@@ -160,18 +164,15 @@ func (self ssTable) Dump() {
 	for _, i := range self.MetaIndex {
 		fmt.Println(i)
 	}
+/*
 	fmt.Println()
 	fmt.Println("** First Data Block **")
 	fmt.Println()
 	idx := self.BlockIndex[0]
 	if block, err := self.readBlock(&idx.Handle); err == nil {
-		iter := NewEntryIterator(block) 
-		for entry, ok := iter.Next(); ok; { 
-			fmt.Println(entry)
-
-			entry, ok = iter.Next()
-		}
+		block.Dump()
 	}
+*/
 }
 
 func (self *ssTable) readFilter() error {
