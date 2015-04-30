@@ -102,7 +102,7 @@ func (self ssTable) Lookup(key Slice) (Slice, error) {
 	//
 	i := self.BlockIndex.Search(key)
 	if i == self.BlockIndex.Len() {
-		return nil, NotFoundErr
+		return nil, ErrNotFound
 	}
 	
 	blockIdx := self.BlockIndex[i]
@@ -115,7 +115,7 @@ func (self ssTable) Lookup(key Slice) (Slice, error) {
 	if entry != nil {
 		return entry.Value, nil
 	}	
-	return nil, NotFoundErr
+	return nil, ErrNotFound
 }
 
 func (self *ssTable) readFooter() error {
@@ -140,7 +140,7 @@ func (self *ssTable) readFooter() error {
 	}
 
 	if footer.MagicNumber != TableMagicNumber {
-		return TableMagicNumberErr
+		return ErrTableMagicNumber
 	}
 
 	self.MetaIndexHandle  = footer.MetaIndexHandle
@@ -149,6 +149,7 @@ func (self *ssTable) readFooter() error {
 	return nil
 }
 
+// Prints some basic information for debuging porposes
 func (self ssTable) Dump() {
 	fmt.Println()
 	fmt.Println(self)
@@ -164,15 +165,6 @@ func (self ssTable) Dump() {
 	for _, i := range self.MetaIndex {
 		fmt.Println(i)
 	}
-/*
-	fmt.Println()
-	fmt.Println("** First Data Block **")
-	fmt.Println()
-	idx := self.BlockIndex[0]
-	if block, err := self.readBlock(&idx.Handle); err == nil {
-		block.Dump()
-	}
-*/
 }
 
 func (self *ssTable) readFilter() error {
@@ -187,7 +179,7 @@ func (self *ssTable) readBlock(bh *BlockHandle) (Block, error) {
 		return nil, err
 	}
 	if n != int(bh.Size + BlockTrailerSize) {
-		return nil, BlockReadCorruptionErr
+		return nil, ErrBlockReadCorruption
 	}
 
 	// Checksum from block trailer
@@ -196,7 +188,7 @@ func (self *ssTable) readBlock(bh *BlockHandle) (Block, error) {
 	checksum2 := util.Checksum32(buffer[:bh.Size + 1])
 
 	if checksum1 != checksum2 {
-		return nil, BlockCRC32CorruptionErr
+		return nil, ErrBlockCRC32Corruption
 	}
 
 	switch buffer[bh.Size] {
@@ -210,9 +202,9 @@ func (self *ssTable) readBlock(bh *BlockHandle) (Block, error) {
 		}
 		return b, nil
 		*/
-		return nil, NotImplementedErr
+		return nil, ErrNotImplemented
 	}
 
-	return nil, TableBlockCompressionErr
+	return nil, ErrTableBlockCompression
 }
 

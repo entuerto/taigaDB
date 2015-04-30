@@ -9,18 +9,18 @@ import (
 )
 
 var (
-	BlockReadCorruptionErr = errors.New("Table.Block: Block read corruption")
-	BlockCRC32CorruptionErr = errors.New("Table.Block: Block checksum mismatch")
+	ErrBlockReadCorruption = errors.New("Table.Block: Block read corruption")
+	ErrBlockCRC32Corruption = errors.New("Table.Block: Block checksum mismatch")
 
-	DecodeSmallBufferErr = errors.New("Decode: Buffer to small")
-	DecodeNot64bitsErr   = errors.New("Decode: Value is not 64bits")
+	ErrDecodeSmallBuffer = errors.New("Decode: Buffer to small")
+	ErrDecodeNot64bits   = errors.New("Decode: Value is not 64bits")
 
-	EncodeBlockHandleBufferErr = errors.New("BlockHandle.Encode: Buffer too small")
-	EncodeFooterBufferErr      = errors.New("Footer.Encode: Buffer too small")
+	ErrEncodeBlockHandleBuffer = errors.New("BlockHandle.Encode: Buffer too small")
+	ErrEncodeFooterBuffer      = errors.New("Footer.Encode: Buffer too small")
 	
-	TableMagicNumberErr = errors.New("Table: Wrong table format")
-	TableBlockCompressionErr = errors.New("Table.Block: Wrong compression format")
+	ErrTableMagicNumber = errors.New("Table: Wrong table format")
+	ErrTableBlockCompression = errors.New("Table.Block: Wrong compression format")
 
-	NotFoundErr = errors.New("Table: Value was not found")
-	NotImplementedErr = errors.New("Table: Not implemented")
+	ErrNotFound = errors.New("Table: Value was not found")
+	ErrNotImplemented = errors.New("Table: Not implemented")
 )

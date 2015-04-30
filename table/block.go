@@ -49,7 +49,7 @@ func (self BlockHandle) String() string {
 // is too small, it will panic.
 func (self BlockHandle) Encode(data Slice) (int, error) {
 	if len(data) < MaxEncodedLength {
-		return 0, EncodeBlockHandleBufferErr
+		return 0, ErrEncodeBlockHandleBuffer
 	}
 
 	n := binary.PutUvarint(data, self.Offset)
@@ -65,17 +65,17 @@ func (self *BlockHandle) Decode(data Slice) (int, error) {
 	self.Offset, n = binary.Uvarint(data)
 	switch {
 	case  n == 0 :
-		return 0, DecodeSmallBufferErr
+		return 0, ErrDecodeSmallBuffer
 	case  n < 0 :
-		return 0, DecodeNot64bitsErr
+		return 0, ErrDecodeNot64bits
 	}
 
 	self.Size, m = binary.Uvarint(data[n:])
 	switch {
 	case  m == 0 :
-		return 0, DecodeSmallBufferErr
+		return 0, ErrDecodeSmallBuffer
 	case  m < 0 :
-		return 0, DecodeNot64bitsErr
+		return 0, ErrDecodeNot64bits
 	}
 
 	return n + m, nil
@@ -110,7 +110,7 @@ func (self Footer) String() string {
 // is too small, it will panic.
 func (self Footer) Encode(data Slice) (int, error) {
 	if len(data) < FooterEncodedLength {
-		return 0, EncodeFooterBufferErr
+		return 0, ErrEncodeFooterBuffer
 	}
 
 	var pos int
