@@ -12,13 +12,13 @@ import (
 
 
 func TestTableOpen(t *testing.T) {
-	if _, err := Open("../data/h.no-compression.sst"); err != nil {
+	if _, err := Open("../data/h.no-compression.sst", DefaultOptions()); err != nil {
 		t.Error(err)
 	} 
 }
 
 func TestTableLookup(t *testing.T) {
-	table, err := Open("../data/h.no-compression.sst")
+	table, err := Open("../data/h.no-compression.sst", DefaultOptions())
 
 	if err != nil {
 		t.Error(err)
@@ -35,7 +35,7 @@ func TestTableLookup(t *testing.T) {
 }
 
 func BenchmarkEntryIterator(b *testing.B) { 
-	if table, err := Open("../data/h.no-compression.sst"); err != nil {
+	if table, err := Open("../data/h.no-compression.sst", DefaultOptions()); err != nil {
 		b.Error(err)
 	} else {
 		b.StartTimer()

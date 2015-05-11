@@ -12,11 +12,6 @@ import (
 	"github.com/entuerto/taigaDB/util"
 )
 
-const (
-	NoCompression     = 0
-	SnappyCompression = 1
-)
-
 type Slice []byte
 
 // A Table is a sorted map from strings to strings.
@@ -33,8 +28,10 @@ type Table interface {
 	ApproximateOffsetOf(key interface{}) uint64 
 }
 
-func Open(filename string) (Table, error) {
-	var table = new(ssTable)
+func Open(filename string, opt *Options) (Table, error) {
+	var table = &ssTable{
+		options: opt,
+	}
 
 	// Read only
 	file, err := os.Open(filename) 
@@ -42,6 +39,10 @@ func Open(filename string) (Table, error) {
 		return nil, err
 	}
 	table.file = file
+
+	if table.options == nil {
+		table.options = DefaultOptions()
+	}
 
 	if err = table.readFooter(); err != nil {
 		return nil, err
@@ -74,6 +75,8 @@ func Open(filename string) (Table, error) {
 
 type ssTable struct {
 	file *os.File
+
+	options *Options
 
 	// Handles to the specified file location
 	MetaIndexHandle  *BlockHandle
@@ -111,7 +114,7 @@ func (self ssTable) Lookup(key Slice) (Slice, error) {
 		return nil, err
 	}
 
-	entry := block.Search(key)
+	entry := block.Search(key, self.options.Comparator)
 	if entry != nil {
 		return entry.Value, nil
 	}	
@@ -191,7 +194,7 @@ func (self *ssTable) readBlock(bh *BlockHandle) (Block, error) {
 		return nil, ErrBlockCRC32Corruption
 	}
 
-	switch buffer[bh.Size] {
+	switch Compression(buffer[bh.Size]) {
 	case NoCompression:
 		return buffer[:bh.Size], nil
 	case SnappyCompression:
@@ -207,4 +210,3 @@ func (self *ssTable) readBlock(bh *BlockHandle) (Block, error) {
 
 	return nil, ErrTableBlockCompression
 }
-

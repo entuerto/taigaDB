@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
+
+	"github.com/entuerto/taigaDB/util"
 )
 
 const (
@@ -169,7 +171,7 @@ func (self Block) RestartStartOffset() int {
 	return len(self) - (1 + int(self.NumberOfRestarts())) * 4
 }
 
-func (self Block) RestartSlice() []uint32 {
+func (self Block) Restarts() []uint32 {
 	numRestarts := self.NumberOfRestarts()
 	if numRestarts == 0  {
 		return nil
@@ -184,20 +186,20 @@ func (self Block) RestartSlice() []uint32 {
 	return restarts
 }
 
-func (self Block) Search(key Slice) *BlockEntry {
+func (self Block) Search(key Slice, cmp util.Comparator) *BlockEntry {
 	numRestarts := self.NumberOfRestarts()
 	if numRestarts == 0  {
 		return nil
 	}
 
-	restarts := self.RestartSlice()
+	restarts := self.Restarts()
 
 	var entry BlockEntry
 	// Search uses binary search to find and return the smallest index
 	pos := sort.Search(numRestarts, func(i int) bool {
 		readBlockEntry(self[restarts[i]:], &entry)
 
-		return string(entry.Key) > string(key)	
+		return cmp.Compare(entry.Key, key) > 0 	
 	})
 
 	if pos < numRestarts {
@@ -206,7 +208,7 @@ func (self Block) Search(key Slice) *BlockEntry {
 		
 		iter := NewEntryIterator(self[restarts[pos]:]) 
 		for e, ok := iter.Next(); ok; { 
-			if string(e.Key) == string(key) {
+			if cmp.Compare(e.Key, key) == 0 {
 				return e
 			}
 			e, ok = iter.Next()
