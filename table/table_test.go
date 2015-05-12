@@ -12,19 +12,26 @@ import (
 
 
 func TestTableOpen(t *testing.T) {
-	if _, err := Open("../data/h.no-compression.sst", DefaultOptions()); err != nil {
-		t.Error(err)
-	} 
-}
-
-func TestTableLookup(t *testing.T) {
-	table, err := Open("../data/h.no-compression.sst", DefaultOptions())
+	table, err := NewReader("../data/h.no-compression.sst", DefaultOptions())
+	defer table.Close()
 
 	if err != nil {
 		t.Error(err)
 	} 
 
-	value, err := table.Lookup(Slice("school")) 
+	//sst := table.(*ssTable)
+	//sst.Dump()
+}
+
+func TestTableLookup(t *testing.T) {
+	table, err := NewReader("../data/h.no-compression.sst", DefaultOptions())
+	defer table.Close()
+
+	if err != nil {
+		t.Error(err)
+	} 
+
+	value, err := table.Read(Slice("school")) 
 	if err != nil {
 		t.Error(err)
 	}
@@ -35,23 +42,28 @@ func TestTableLookup(t *testing.T) {
 }
 
 func BenchmarkEntryIterator(b *testing.B) { 
-	if table, err := Open("../data/h.no-compression.sst", DefaultOptions()); err != nil {
+	table, err := NewReader("../data/h.no-compression.sst", DefaultOptions())
+	defer table.Close()
+
+	if err != nil {
 		b.Error(err)
-	} else {
-		b.StartTimer()
+		return
+	} 
 
-		sst := table.(*ssTable)
-		idx := sst.BlockIndex[0]
+	b.StartTimer()
 
-		for i := 0; i < b.N; i++ {
-			if block, err := sst.readBlock(&idx.Handle); err == nil {
-				iter := NewEntryIterator(block) 
+	sst := table.(*ssTable)
+	idx := sst.BlockIndex[0]
 
-				for _, ok := iter.Next(); ok; { 
-					
-					_, ok = iter.Next()
-				}
+	for i := 0; i < b.N; i++ {
+		if block, err := sst.readBlock(&idx.Handle); err == nil {
+			iter := NewEntryIterator(block) 
+
+			for _, ok := iter.Next(); ok; { 
+				
+				_, ok = iter.Next()
 			}
 		}
 	}
+	
 }
