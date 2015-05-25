@@ -6,6 +6,11 @@ package table
 
 type Slice []byte
 
+type Entry struct {
+	Key   Slice
+	Value Slice
+}
+
 // A Table is a sorted map from strings to strings.
 type Table interface {
 	Closer
@@ -44,4 +49,10 @@ type Reader interface {
 type Writer interface {
 	// Write a key/value to the table
 	Write(key, value Slice) error
+}
+
+type Builder interface {
+	Add(key, value Slice) error
+	Flush() error
+	Finish() error
 }

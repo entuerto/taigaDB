@@ -33,15 +33,15 @@ func NewReader(filename string, opt *Options) (TableReader, error) {
 		return nil, err
 	}
 
-	if err = table.readFilter(); err != nil {
-		return nil, err
-	}
-
 	// Read the meta block
 	if metaBlock, err := table.readBlock(table.MetaIndexHandle); err != nil {
 		return nil, err
 	} else {
 		table.MetaIndex = decodeIndexEntries(metaBlock)
+	}
+
+	if err = table.readFilter(); err != nil {
+		return nil, err
 	}
 
 	// Read the index block

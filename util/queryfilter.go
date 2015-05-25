@@ -19,7 +19,7 @@ type QueryFilter interface {
 type BloomFilter []byte
 
 func (f BloomFilter) Name() string {
-	return "Bloom Filter"
+	return "BloomFilter"
 }
 
 func (f BloomFilter) KeyMayMatch(key []byte) bool {

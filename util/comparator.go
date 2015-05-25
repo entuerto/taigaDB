@@ -38,3 +38,15 @@ func (BytewiseComparator) Name() string {
 func (BytewiseComparator) Compare(a, b []byte) int {
 	return bytes.Compare(a, b)
 }
+
+// Returns the largest pos such that a[:pos] equals b[:pos].
+func SharedPrefix(a, b []byte) int {
+	i, n := 0, len(a)
+	if n > len(b) {
+		n = len(b)
+	}
+	for i < n && a[i] == b[i] {
+		i++
+	}
+	return i
+}
